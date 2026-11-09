@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>E-ABSENSI | Portal Multi-Role Terpadu</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .animate-spin-fast { animation: spin 0.7s linear infinite; }
+    @media print {
+      body * { visibility: hidden; }
+      .printableArea, .printableArea * { visibility: visible; }
+      .printableArea { position: absolute; left: 0; top: 0; width: 100%; }
+      .no-print { display: none; }
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+  <div id="toastBox" class="fixed top-4 right-4 z-50 space-y-2 max-w-xs w-full"></div>
+
+  <!-- VIEW 1: LOGIN -->
+  <div id="viewLogin" class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-900 to-emerald-950">
+    <div class="max-w-md w-full bg-white rounded-3xl shadow-2xl overflow-hidden">
+      <div class="bg-emerald-600 p-8 text-center text-white">
+        <h1 class="text-2xl font-extrabold">E-ABSENSI</h1>
+        <p class="text-emerald-100 text-xs mt-1">Portal Terpusat (Admin, Guru, Siswa, & Wali)</p>
+      </div>
+      <form id="formLogin" class="p-8 space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Username</label>
+          <input type="text" id="loginUser" required placeholder="admin" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-500">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Password</label>
+          <input type="password" id="loginPass" required placeholder="••••••" class="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-emerald-500">
+        </div>
+        <button type="submit" id="btnLogin" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow transition text-sm flex items-center justify-center gap-2">
+          <span>Masuk ke Portal</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- VIEW 2: PORTAL UTAMA -->
+  <div id="viewApp" class="hidden min-h-screen flex flex-col md:flex-row">
+    <aside id="sidebar" class="w-64 bg-slate-900 text-slate-300 flex flex-col shrink-0 fixed md:static inset-y-0 left-0 z-30 -translate-x-full md:translate-x-0 transition-transform">
+      <div class="h-16 flex items-center justify-between px-5 bg-slate-950 border-b border-slate-800">
+        <div>
+          <h2 class="font-bold text-white text-sm">E-ABSENSI</h2>
+          <p id="sideSchoolName" class="text-[10px] text-emerald-400 truncate max-w-[150px]">Memuat...</p>
+        </div>
+        <button onclick="toggleSidebar()" class="md:hidden text-slate-400">✕</button>
+      </div>
+      <nav id="sidebarMenu" class="flex-1 p-3 space-y-1 text-xs overflow-y-auto"></nav>
+      <div class="p-3 bg-slate-950 border-t border-slate-800 flex items-center justify-between">
+        <div>
+          <p id="userLabel" class="text-xs font-bold text-white">User</p>
+          <p id="roleLabel" class="text-[10px] text-emerald-400 font-bold uppercase">ROLE</p>
+        </div>
+        <button onclick="logout()" class="px-2.5 py-1 bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white rounded-lg text-xs font-bold transition">Keluar</button>
+      </div>
+    </aside>
+
+    <div class="flex-1 flex flex-col min-w-0">
+      <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 md:px-8">
+        <div class="flex items-center gap-3">
+          <button onclick="toggleSidebar()" class="md:hidden p-2 bg-slate-100 rounded-lg">☰</button>
+          <h1 id="pageTitle" class="font-bold text-slate-800 text-base">Dashboard</h1>
+        </div>
+        <div id="syncIndicator" class="hidden items-center gap-2 text-xs font-semibold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100">
+          <svg class="w-4 h-4 animate-spin-fast" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+          <span>Menghubungkan ke server...</span>
+        </div>
+      </header>
+
+      <main class="flex-1 p-4 md:p-8 overflow-y-auto space-y-6">
+        <!-- DASHBOARD -->
+        <div id="pageDashboard" class="space-y-6">
+          <div class="bg-gradient-to-r from-emerald-700 to-teal-800 rounded-2xl p-6 text-white shadow">
+            <h2 class="text-xl font-bold">Selamat Datang, <span id="dashRoleTitle"></span></h2>
+            <p class="text-emerald-100 text-xs mt-1">Sistem Informasi Manajemen Kehadiran Siswa & Pesantren.</p>
+          </div>
+          
+          <div id="adminStatsGroup" class="space-y-6">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm"><p class="text-xs font-bold text-slate-500 uppercase">Total Siswa</p><p id="statSiswa" class="text-2xl font-black text-slate-800 mt-1">0</p></div>
+              <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm"><p class="text-xs font-bold text-slate-500 uppercase">Total Guru</p><p id="statGuru" class="text-2xl font-black text-slate-800 mt-1">0</p></div>
+              <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm"><p class="text-xs font-bold text-slate-500 uppercase">Total Kelas</p><p id="statKelas" class="text-2xl font-black text-slate-800 mt-1">0</p></div>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+              <div class="flex justify-between items-center">
+                <h3 class="font-bold text-slate-800 text-sm">Statistik Kehadiran Hari Ini</h3>
+                <input type="date" id="statTanggal" onchange="loadDashboardStatistik()" class="px-3 py-1.5 border rounded-xl text-xs font-medium bg-slate-50">
+              </div>
+              <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
+                <div class="p-4 bg-emerald-50 rounded-xl border border-emerald-100"><p class="text-[10px] font-bold text-emerald-600 uppercase">Hadir</p><p id="statHadir" class="text-xl font-black text-emerald-700 mt-1">0</p></div>
+                <div class="p-4 bg-sky-50 rounded-xl border border-sky-100"><p class="text-[10px] font-bold text-sky-600 uppercase">Izin</p><p id="statIzin" class="text-xl font-black text-sky-700 mt-1">0</p></div>
+                <div class="p-4 bg-amber-50 rounded-xl border border-amber-100"><p class="text-[10px] font-bold text-amber-600 uppercase">Sakit</p><p id="statSakit" class="text-xl font-black text-amber-700 mt-1">0</p></div>
+                <div class="p-4 bg-rose-50 rounded-xl border border-rose-100"><p class="text-[10px] font-bold text-rose-600 uppercase">Alpa</p><p id="statAlpa" class="text-xl font-black text-rose-700 mt-1">0</p></div>
+                <div class="p-4 bg-purple-50 rounded-xl border border-purple-100"><p class="text-[10px] font-bold text-purple-600 uppercase">Terlambat</p><p id="statTerlambat" class="text-xl font-black text-purple-700 mt-1">0</p></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TABEL MASTER DATA -->
+        <div id="pageTable" class="hidden space-y-4">
+          <div class="flex justify-between items-center">
+            <h2 id="tableTitle" class="text-lg font-bold text-slate-800">Data</h2>
+            <div class="flex gap-2">
+              <button onclick="exportTableToCSV()" class="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold shadow">Unduh CSV</button>
+              <button id="btnAddRow" onclick="openAddModal()" class="hidden px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow">+ Tambah Data</button>
+            </div>
+          </div>
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
+            <table id="masterTable" class="w-full text-left text-xs">
+              <thead id="tableHead" class="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase"></thead>
+              <tbody id="tableBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- HALAMAN ABSENSI -->
+        <div id="pageAbsensi" class="hidden space-y-4">
+          <div class="flex flex-wrap gap-3 items-center justify-between bg-white p-4 rounded-2xl border shadow-sm">
+            <div class="flex items-center gap-3">
+              <div>
+                <label class="block text-[10px] font-bold text-slate-500 uppercase">Tanggal</label>
+                <input type="date" id="filterTanggal" class="px-3 py-1.5 border rounded-xl text-xs font-medium bg-slate-50">
+              </div>
+              <div>
+                <label class="block text-[10px] font-bold text-slate-500 uppercase">Pilih Kelas</label>
+                <select id="filterKelasAbsen" onchange="loadAbsensiHarian()" class="px-3 py-1.5 border rounded-xl text-xs font-medium bg-slate-50 min-w-[150px]"></select>
+              </div>
+            </div>
+            <button onclick="loadAbsensiHarian()" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold shadow">Muat Data</button>
+          </div>
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-50 border-b text-slate-500 uppercase">
+                <tr><th class="p-3">NIS</th><th class="p-3">Nama Siswa</th><th class="p-3 text-center">Status Kehadiran</th></tr>
+              </thead>
+              <tbody id="absenTableBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- HALAMAN IZIN & SAKIT -->
+        <div id="pageIzin" class="hidden space-y-4">
+          <div id="formIzinContainer" class="hidden bg-white p-6 rounded-2xl border shadow-sm space-y-4 max-w-lg">
+            <h3 class="font-bold text-slate-800 text-sm">Formulir Pengajuan Izin / Sakit</h3>
+            <form onsubmit="submitIzin(event)" class="space-y-3">
+              <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Tanggal</label><input type="date" id="izinTanggal" required class="w-full px-3 py-2 border rounded-xl text-xs bg-slate-50"></div>
+              <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Jenis</label><select id="izinJenis" class="w-full px-3 py-2 border rounded-xl text-xs bg-white"><option value="IZIN">Izin</option><option value="SAKIT">Sakit</option></select></div>
+              <div><label class="block text-[11px] font-bold text-slate-600 mb-1">Keterangan</label><textarea id="izinKeterangan" rows="3" required placeholder="Alasan..." class="w-full px-3 py-2 border rounded-xl text-xs"></textarea></div>
+              <button type="submit" id="btnSubmitIzin" class="w-full py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold shadow">Kirim Pengajuan</button>
+            </form>
+          </div>
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
+            <div class="p-4 border-b font-bold text-slate-800 text-sm">Daftar Pengajuan Izin & Sakit</div>
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-50 border-b text-slate-500 uppercase">
+                <tr><th class="p-3">Tanggal</th><th class="p-3">Nama Siswa</th><th class="p-3">Jenis</th><th class="p-3">Keterangan</th><th class="p-3 text-center">Status</th><th class="p-3 text-center">Aksi</th></tr>
+              </thead>
+              <tbody id="izinTableBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- PORTAL WALI -->
+        <div id="pageWali" class="hidden space-y-4">
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto p-4 space-y-4">
+            <h3 class="font-bold text-slate-800 text-sm">Monitoring Kehadiran Anak</h3>
+            <div id="waliContent" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
+          </div>
+        </div>
+
+        <!-- REKAP -->
+        <div id="pageRekapKelas" class="hidden space-y-4">
+          <div class="flex justify-between items-center bg-white p-4 rounded-2xl border shadow-sm no-print">
+            <h3 class="font-bold text-slate-800 text-sm">Rekapitulasi Kehadiran Per Kelas</h3>
+            <button onclick="window.print()" class="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold shadow">Cetak Laporan</button>
+          </div>
+          <div class="printableArea bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto p-2">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-50 border-b text-slate-500 uppercase">
+                <tr><th class="p-3">Nama Kelas</th><th class="p-3 text-center">Total Siswa</th><th class="p-3 text-center">Hadir</th><th class="p-3 text-center">Izin</th><th class="p-3 text-center">Sakit</th><th class="p-3 text-center">Alpa</th><th class="p-3 text-center">Terlambat</th><th class="p-3 text-center">Persentase</th></tr>
+              </thead>
+              <tbody id="rekapKelasTableBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="pageRekapSiswa" class="hidden space-y-4">
+          <div class="flex flex-wrap gap-3 items-center justify-between bg-white p-4 rounded-2xl border shadow-sm no-print">
+            <select id="filterKelasRekap" onchange="loadRekapSiswa()" class="px-3 py-1.5 border rounded-xl text-xs font-medium bg-slate-50 min-w-[150px]"></select>
+            <button onclick="window.print()" class="px-4 py-2 bg-slate-800 text-white rounded-xl text-xs font-bold shadow">Cetak Laporan</button>
+          </div>
+          <div class="printableArea bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto p-2">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-50 border-b text-slate-500 uppercase">
+                <tr><th class="p-3">NIS</th><th class="p-3">Nama Siswa</th><th class="p-3 text-center">Hadir</th><th class="p-3 text-center">Izin</th><th class="p-3 text-center">Sakit</th><th class="p-3 text-center">Alpa</th><th class="p-3 text-center">Terlambat</th><th class="p-3 text-center">Persentase</th></tr>
+              </thead>
+              <tbody id="rekapSiswaTableBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- LOG -->
+        <div id="pageLog" class="hidden space-y-4">
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-50 border-b text-slate-500 uppercase">
+                <tr><th class="p-3">Waktu</th><th class="p-3">Role</th><th class="p-3">Aksi</th><th class="p-3">Keterangan</th></tr>
+              </thead>
+              <tbody id="logTableBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- SCANNER -->
+        <div id="pageScan" class="hidden max-w-md mx-auto space-y-4 text-center">
+          <div class="bg-white p-6 rounded-2xl border shadow-sm space-y-4">
+            <h2 class="font-bold text-slate-800 text-sm">Scanner QR Presensi Siswa</h2>
+            <div id="reader" class="overflow-hidden rounded-xl border bg-slate-100"></div>
+            <div id="scanResult" class="p-3 rounded-xl bg-slate-50 text-xs font-bold text-slate-600">Arahkan kamera ke QR Code siswa</div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- MODAL FORM TAMBAH / EDIT -->
+  <div id="modalForm" class="hidden fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+      <div class="flex justify-between items-center border-b pb-3">
+        <h3 id="modalTitle" class="font-bold text-slate-800">Form Data</h3>
+        <button onclick="closeModal()" class="text-slate-400 hover:text-slate-700">✕</button>
+      </div>
+      <form id="dynamicForm" onsubmit="submitForm(event)" class="space-y-3 max-h-[65vh] overflow-y-auto pr-1"></form>
+    </div>
+  </div>
+
+  <!-- MODAL QR -->
+  <div id="modalQR" class="hidden fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-xs w-full p-6 text-center space-y-4 shadow-2xl">
+      <div class="flex justify-between items-center border-b pb-2">
+        <h3 class="font-bold text-slate-800 text-sm">Kartu QR Siswa</h3>
+        <button onclick="document.getElementById('modalQR').classList.add('hidden')" class="text-slate-400 hover:text-slate-700">✕</button>
+      </div>
+      <div class="flex flex-col items-center space-y-2">
+        <img id="qrImage" src="" alt="QR" class="w-44 h-44 border rounded-xl p-2 bg-white">
+        <p id="qrStudentName" class="font-bold text-slate-800 text-sm"></p>
+        <p id="qrTokenText" class="text-[11px] font-mono bg-slate-100 px-2 py-1 rounded text-slate-600"></p>
+      </div>
+      <button onclick="window.print()" class="w-full py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold">Cetak Kartu</button>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = "https://script.google.com/macros/s/AKfycbzPn35UR40rGGBHXNEd12pXImanh0NShm_Dcmv8e-DTeQVYwtL4FZs5YJE0qECX3AwJ6A/exec";
+
+    let session = null;
+    let activeSheet = "";
+    let activeHeaders = [];
+    let currentRowsData = [];
+    let isEditing = false;
+    let editIdValue = "";
+    let cacheKelas = [];
+    let cacheGuru = [];
+    let html5QrCode = null;
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const saved = localStorage.getItem("EABSENSI_SESSION");
+      if (saved) { session = JSON.parse(saved); initPortal(); }
+    });
+
+    async function callApi(action, params = {}) {
+      const payload = { action, token: session ? session.token : "", ...params };
+      const indicator = document.getElementById("syncIndicator");
+      indicator.classList.remove("hidden");
+      indicator.classList.add("flex");
+
+      try {
+        const res = await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(payload)
+        });
+        return await res.json();
+      } catch (e) {
+        return new Promise((resolve, reject) => {
+          const cb = "cb_" + Math.floor(Math.random() * 1000000);
+          window[cb] = (data) => { delete window[cb]; script.remove(); resolve(data); };
+          const qs = new URLSearchParams({ ...payload, callback: cb }).toString();
+          const script = document.createElement("script");
+          script.src = `${API_URL}?${qs}`;
+          script.onerror = () => { delete window[cb]; script.remove(); reject(new Error("Koneksi gagal")); };
+          document.body.appendChild(script);
+        });
+      } finally {
+        indicator.classList.remove("flex");
+        indicator.classList.add("hidden");
+      }
+    }
+
+    document.getElementById("formLogin").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById("btnLogin");
+      btn.disabled = true; btn.textContent = "Menghubungkan...";
+      try {
+        const res = await callApi("LOGIN", { username: document.getElementById("loginUser").value, password: document.getElementById("loginPass").value });
+        if (res.success) {
+          session = res.data;
+          localStorage.setItem("EABSENSI_SESSION", JSON.stringify(session));
+          toast("success", "Login berhasil!");
+          initPortal();
+        } else { toast("error", res.message); }
+      } catch (err) { toast("error", err.message); }
+      finally { btn.disabled = false; btn.textContent = "Masuk ke Portal"; }
+    });
+
+    async function initPortal() {
+      document.getElementById("viewLogin").classList.add("hidden");
+      document.getElementById("viewApp").classList.remove("hidden");
+      document.getElementById("userLabel").textContent = session.username;
+      document.getElementById("roleLabel").textContent = session.role;
+      document.getElementById("dashRoleTitle").textContent = session.role + " (" + session.username + ")";
+
+      buildMenuByRole(session.role);
+      const info = await callApi("GET_DASHBOARD_INFO");
+      if (info.success) {
+        document.getElementById("sideSchoolName").textContent = info.data.schoolName;
+        document.getElementById("statSiswa").textContent = info.data.totalSiswa;
+        document.getElementById("statGuru").textContent = info.data.totalGuru;
+        document.getElementById("statKelas").textContent = info.data.totalKelas;
+      }
+      if (session.role !== "WALI" && session.role !== "SISWA") {
+        document.getElementById("statTanggal").valueAsDate = new Date();
+        loadDashboardStatistik();
+      }
+    }
+
+    function buildMenuByRole(role) {
+      const menus = {
+        ADMIN: [
+          { id: "DASH", label: "Dashboard" },
+          { id: "DATA_SEKOLAH", label: "Data Sekolah" },
+          { id: "DATA_SISWA", label: "Data Siswa" },
+          { id: "DATA_GURU", label: "Data Guru" },
+          { id: "DATA_KELAS", label: "Data Kelas" },
+          { id: "DATA_ORANG_TUA", label: "Data Orang Tua" },
+          { id: "RELASI_WALI_SISWA", label: "Relasi Wali & Siswa" },
+          { id: "DATA_SESI_PELAJARAN", label: "Sesi Pelajaran" },
+          { id: "DATA_PERANGKAT", label: "Perangkat Scanner" },
+          { id: "DATA_AKUN", label: "Manajemen Akun" },
+          { id: "ABSENSI_HARIAN", label: "Absensi Harian" },
+          { id: "IZIN_SAKIT", label: "Validasi Izin & Sakit" },
+          { id: "REKAP_KELAS", label: "Rekap Per Kelas" },
+          { id: "REKAP_SISWA", label: "Rekap Per Siswa" },
+          { id: "LOG_AKTIVITAS", label: "Log Aktivitas" },
+          { id: "SCAN_QR", label: "Scan QR Absen" }
+        ],
+        GURU: [
+          { id: "DASH", label: "Dashboard Guru" },
+          { id: "ABSENSI_HARIAN", label: "Absensi Harian" },
+          { id: "IZIN_SAKIT", label: "Validasi Izin & Sakit" },
+          { id: "REKAP_KELAS", label: "Rekap Per Kelas" },
+          { id: "REKAP_SISWA", label: "Rekap Per Siswa" },
+          { id: "SCAN_QR", label: "Scan QR Absen" }
+        ],
+        SISWA: [
+          { id: "DASH", label: "Dashboard Siswa" },
+          { id: "IZIN_SAKIT", label: "Pengajuan Izin / Sakit" },
+          { id: "REKAP_SISWA", label: "Rekap Kehadiran Saya" }
+        ],
+        WALI: [
+          { id: "PORTAL_WALI", label: "Portal Orang Tua" }
+        ]
+      };
+      const list = menus[role] || menus.SISWA;
+      document.getElementById("sidebarMenu").innerHTML = list.map(m => `
+        <button onclick="openMenu('${m.id}', '${m.label}')" class="w-full text-left px-3 py-2.5 rounded-xl hover:bg-slate-800 hover:text-white transition font-medium">
+          ${m.label}
+        </button>
+      `).join("");
+      
+      if (role === "WALI") openMenu("PORTAL_WALI", "Portal Orang Tua");
+      else if (role === "SISWA") openMenu("DASH", "Dashboard Siswa");
+    }
+
+    async function loadDashboardStatistik() {
+      const tanggal = document.getElementById("statTanggal").value;
+      const res = await callApi("GET_STATISTIK_DASHBOARD", { tanggal });
+      if (res.success) {
+        document.getElementById("statHadir").textContent = res.data.hadir;
+        document.getElementById("statIzin").textContent = res.data.izin;
+        document.getElementById("statSakit").textContent = res.data.sakit;
+        document.getElementById("statAlpa").textContent = res.data.alpa;
+        document.getElementById("statTerlambat").textContent = res.data.terlambat;
+      }
+    }
+
+    async function openMenu(id, label) {
+      document.getElementById("pageTitle").textContent = label;
+      
+      document.getElementById("pageDashboard").classList.add("hidden");
+      document.getElementById("pageTable").classList.add("hidden");
+      document.getElementById("pageAbsensi").classList.add("hidden");
+      document.getElementById("pageIzin").classList.add("hidden");
+      document.getElementById("pageWali").classList.add("hidden");
+      document.getElementById("pageRekapKelas").classList.add("hidden");
+      document.getElementById("pageRekapSiswa").classList.add("hidden");
+      document.getElementById("pageLog").classList.add("hidden");
+      document.getElementById("pageScan").classList.add("hidden");
+
+      if (html5QrCode && html5QrCode.isScanning) { await html5QrCode.stop(); }
+
+      if (id === "DASH") { document.getElementById("pageDashboard").classList.remove("hidden"); loadDashboardStatistik(); return; }
+      if (id === "ABSENSI_HARIAN") { document.getElementById("pageAbsensi").classList.remove("hidden"); document.getElementById("filterTanggal").valueAsDate = new Date(); await loadKelasFilter("filterKelasAbsen"); loadAbsensiHarian(); return; }
+      if (id === "IZIN_SAKIT") { document.getElementById("pageIzin").classList.remove("hidden"); document.getElementById("formIzinContainer").classList.toggle("hidden", session.role !== "SISWA"); if (session.role === "SISWA") document.getElementById("izinTanggal").valueAsDate = new Date(); loadDaftarIzin(); return; }
+      if (id === "PORTAL_WALI") { document.getElementById("pageWali").classList.remove("hidden"); loadPortalWali(); return; }
+      if (id === "REKAP_KELAS") { document.getElementById("pageRekapKelas").classList.remove("hidden"); loadRekapKelas(); return; }
+      if (id === "REKAP_SISWA") { document.getElementById("pageRekapSiswa").classList.remove("hidden"); await loadKelasFilter("filterKelasRekap"); loadRekapSiswa(); return; }
+      if (id === "LOG_AKTIVITAS") { document.getElementById("pageLog").classList.remove("hidden"); loadLogAktivitas(); return; }
+      if (id === "SCAN_QR") { document.getElementById("pageScan").classList.remove("hidden"); initScanner(); return; }
+
+      document.getElementById("pageTable").classList.remove("hidden");
+      document.getElementById("tableTitle").textContent = label;
+      document.getElementById("btnAddRow").classList.toggle("hidden", session.role !== "ADMIN");
+
+      activeSheet = id;
+      const tbody = document.getElementById("tableBody");
+      tbody.innerHTML = `<tr><td colspan="12" class="p-6 text-center text-slate-400">Memuat data...</td></tr>`;
+
+      const res = await callApi("GET_MASTER_DATA", { sheetName: id });
+      if (!res.success) { toast("error", res.message); return; }
+
+      if (id === "DATA_KELAS") cacheKelas = res.rows;
+      if (id === "DATA_GURU") cacheGuru = res.rows;
+
+      activeHeaders = res.headers;
+      currentRowsData = res.rows;
+      document.getElementById("tableHead").innerHTML = `<tr>${activeHeaders.map(h => `<th class="p-3">${h}</th>`).join("")}${session.role === "ADMIN" || id === "DATA_SISWA" ? `<th class="p-3 text-center">Aksi</th>` : ""}</tr>`;
+
+      if (res.rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="12" class="p-6 text-center text-slate-400">Belum ada data.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = res.rows.map((r, idx) => `
+        <tr class="hover:bg-slate-50">
+          ${activeHeaders.map(h => `<td class="p-3">${r[h] || "-"}</td>`).join("")}
+          <td class="p-3 text-center flex justify-center gap-1">
+            ${id === "DATA_SISWA" && r.QR_TOKEN ? `<button onclick="showQR('${r.NAMA_LENGKAP}', '${r.QR_TOKEN}')" class="px-2 py-1 bg-emerald-50 text-emerald-700 rounded-lg font-bold">Lihat QR</button>` : ""}
+            ${session.role === "ADMIN" ? `
+              <button onclick="openEditModal(${idx})" class="px-2 py-1 bg-sky-50 text-sky-700 rounded-lg font-bold">Edit</button>
+              <button onclick="deleteRow('${r[activeHeaders[0]]}')" class="px-2 py-1 bg-rose-50 text-rose-600 rounded-lg font-bold">Hapus</button>
+            ` : ""}
+          </td>
+        </tr>
+      `).join("");
+    }
+
+    async function loadKelasFilter(elementId) {
+      if (cacheKelas.length === 0) {
+        const res = await callApi("GET_MASTER_DATA", { sheetName: "DATA_KELAS" });
+        if (res.success) cacheKelas = res.rows;
+      }
+      const sel = document.getElementById(elementId);
+      if (sel) sel.innerHTML = `<option value="">-- Semua Kelas --</option>` + cacheKelas.map(k => `<option value="${k.ID_KELAS}">${k.NAMA_KELAS}</option>`).join("");
+    }
+
+    async function loadAbsensiHarian() {
+      const tanggal = document.getElementById("filterTanggal").value;
+      const idKelas = document.getElementById("filterKelasAbsen").value;
+      const tbody = document.getElementById("absenTableBody");
+      tbody.innerHTML = `<tr><td colspan="3" class="p-6 text-center text-slate-400">Memuat data...</td></tr>`;
+
+      const res = await callApi("GET_ABSENSI_HARIAN", { tanggal, idKelas });
+      if (!res.success) { toast("error", res.message); return; }
+
+      tbody.innerHTML = res.data.map(s => `
+        <tr class="hover:bg-slate-50">
+          <td class="p-3 font-mono">${s.NIS}</td>
+          <td class="p-3 font-medium">${s.NAMA_LENGKAP}</td>
+          <td class="p-3 text-center">
+            <div class="inline-flex gap-1 bg-slate-100 p-1 rounded-xl">
+              ${['H', 'I', 'S', 'A', 'T'].map(st => `
+                <button onclick="updateAbsen('${s.ID_SISWA}', '${st}')" class="px-2.5 py-1 rounded-lg text-xs font-bold transition ${s.STATUS === st ? getBadgeColor(st) + ' shadow-sm' : 'text-slate-500 hover:bg-white'}">${st}</button>
+              `).join("")}
+            </div>
+          </td>
+        </tr>
+      `).join("");
+    }
+
+    async function submitIzin(e) {
+      e.preventDefault();
+      const btn = document.getElementById("btnSubmitIzin");
+      btn.disabled = true; btn.textContent = "Mengirim...";
+      const res = await callApi("AJUKAN_IZIN", {
+        tanggal: document.getElementById("izinTanggal").value,
+        jenisIzin: document.getElementById("izinJenis").value,
+        keterangan: document.getElementById("izinKeterangan").value
+      });
+      btn.disabled = false; btn.textContent = "Kirim Pengajuan";
+      if (res.success) { toast("success", res.message); document.getElementById("izinKeterangan").value = ""; loadDaftarIzin(); }
+      else { toast("error", res.message); }
+    }
+
+    async function loadDaftarIzin() {
+      const tbody = document.getElementById("izinTableBody");
+      tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400">Memuat...</td></tr>`;
+      const res = await callApi("GET_DATA_IZIN");
+      if (!res.success) { toast("error", res.message); return; }
+      if (res.data.length === 0) { tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-400">Belum ada pengajuan izin.</td></tr>`; return; }
+
+      tbody.innerHTML = res.data.map(i => `
+        <tr class="hover:bg-slate-50">
+          <td class="p-3 font-mono">${i.TANGGAL}</td>
+          <td class="p-3 font-medium">${i.NAMA_LENGKAP}</td>
+          <td class="p-3 font-bold">${i.JENIS_IZIN}</td>
+          <td class="p-3 text-slate-600">${i.KETERANGAN}</td>
+          <td class="p-3 text-center font-bold ${i.STATUS_PERSETUJUAN === 'DISETUJUI' ? 'text-emerald-600' : i.STATUS_PERSETUJUAN === 'DITOLAK' ? 'text-rose-600' : 'text-amber-500'}">${i.STATUS_PERSETUJUAN}</td>
+          <td class="p-3 text-center">
+            ${(session.role === 'ADMIN' || session.role === 'GURU') && i.STATUS_PERSETUJUAN === 'PENDING' ? `
+              <div class="inline-flex gap-1">
+                <button onclick="prosesIzin('${i.ID_IZIN}', 'DISETUJUI')" class="px-2 py-1 bg-emerald-600 text-white rounded-lg font-bold">Setujui</button>
+                <button onclick="prosesIzin('${i.ID_IZIN}', 'DITOLAK')" class="px-2 py-1 bg-rose-600 text-white rounded-lg font-bold">Tolak</button>
+              </div>
+            ` : `<span class="text-slate-400 text-[11px]">${i.PEMERIKSA}</span>`}
+          </td>
+        </tr>
+      `).join("");
+    }
+
+    async function prosesIzin(idIzin, status) {
+      const res = await callApi("PROSES_IZIN", { idIzin, status });
+      if (res.success) { toast("success", res.message); loadDaftarIzin(); }
+      else { toast("error", res.message); }
+    }
+
+    async function loadPortalWali() {
+      const box = document.getElementById("waliContent");
+      box.innerHTML = `<p class="text-xs text-slate-400">Memuat data anak...</p>`;
+      const res = await callApi("GET_PORTAL_WALI");
+      if (!res.success) { toast("error", res.message); return; }
+      if (res.data.length === 0) { box.innerHTML = `<p class="text-xs text-slate-400">Tidak ada data anak terhubung.</p>`; return; }
+
+      box.innerHTML = res.data.map(a => `
+        <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-3">
+          <div><h4 class="font-bold text-slate-800 text-sm">${a.NAMA_LENGKAP}</h4><p class="text-xs font-mono text-slate-500">NIS: ${a.NIS}</p></div>
+          <div class="grid grid-cols-5 gap-2 text-center">
+            <div class="bg-emerald-100 p-2 rounded-xl"><p class="text-[9px] font-bold text-emerald-700">H</p><p class="font-black text-emerald-800 text-sm">${a.HADIR}</p></div>
+            <div class="bg-sky-100 p-2 rounded-xl"><p class="text-[9px] font-bold text-sky-700">I</p><p class="font-black text-sky-800 text-sm">${a.IZIN}</p></div>
+            <div class="bg-amber-100 p-2 rounded-xl"><p class="text-[9px] font-bold text-amber-700">S</p><p class="font-black text-amber-800 text-sm">${a.SAKIT}</p></div>
+            <div class="bg-rose-100 p-2 rounded-xl"><p class="text-[9px] font-bold text-rose-700">A</p><p class="font-black text-rose-800 text-sm">${a.ALPA}</p></div>
+            <div class="bg-purple-100 p-2 rounded-xl"><p class="text-[9px] font-bold text-purple-700">T</p><p class="font-black text-purple-800 text-sm">${a.TERLAMBAT}</p></div>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    async function loadRekapKelas() {
+      const tbody = document.getElementById("rekapKelasTableBody");
+      tbody.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-slate-400">Memuat...</td></tr>`;
+      const res = await callApi("GET_REKAP_KELAS");
+      if (!res.success) { toast("error", res.message); return; }
+      tbody.innerHTML = res.data.map(r => `
+        <tr class="hover:bg-slate-50">
+          <td class="p-3 font-medium">${r.NAMA_KELAS}</td>
+          <td class="p-3 text-center">${r.TOTAL_SISWA}</td>
+          <td class="p-3 text-center font-bold text-emerald-600">${r.HADIR}</td>
+          <td class="p-3 text-center font-bold text-sky-600">${r.IZIN}</td>
+          <td class="p-3 text-center font-bold text-amber-500">${r.SAKIT}</td>
+          <td class="p-3 text-center font-bold text-rose-600">${r.ALPA}</td>
+          <td class="p-3 text-center font-bold text-purple-600">${r.TERLAMBAT}</td>
+          <td class="p-3 text-center font-black">${r.PERSENTASE}%</td>
+        </tr>
+      `).join("");
+    }
+
+    async function loadRekapSiswa() {
+      const idKelas = document.getElementById("filterKelasRekap").value;
+      const tbody = document.getElementById("rekapSiswaTableBody");
+      tbody.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-slate-400">Memuat...</td></tr>`;
+      const res = await callApi("GET_REKAP_SISWA", { idKelas });
+      if (!res.success) { toast("error", res.message); return; }
+      tbody.innerHTML = res.data.map(r => `
+        <tr class="hover:bg-slate-50">
+          <td class="p-3 font-mono">${r.NIS}</td>
+          <td class="p-3 font-medium">${r.NAMA_LENGKAP}</td>
+          <td class="p-3 text-center font-bold text-emerald-600">${r.HADIR}</td>
+          <td class="p-3 text-center font-bold text-sky-600">${r.IZIN}</td>
+          <td class="p-3 text-center font-bold text-amber-500">${r.SAKIT}</td>
+          <td class="p-3 text-center font-bold text-rose-600">${r.ALPA}</td>
+          <td class="p-3 text-center font-bold text-purple-600">${r.TERLAMBAT}</td>
+          <td class="p-3 text-center font-black">${r.PERSENTASE}%</td>
+        </tr>
+      `).join("");
+    }
+
+    async function loadLogAktivitas() {
+      const tbody = document.getElementById("logTableBody");
+      tbody.innerHTML = `<tr><td colspan="4" class="p-6 text-center text-slate-400">Memuat...</td></tr>`;
+      const res = await callApi("GET_LOG_AKTIVITAS");
+      if (!res.success) { toast("error", res.message); return; }
+      tbody.innerHTML = res.rows.map(l => `
+        <tr class="hover:bg-slate-50">
+          <td class="p-3 font-mono text-slate-500">${new Date(l.WAKTU).toLocaleString('id-ID')}</td>
+          <td class="p-3 font-bold text-emerald-700">${l.ROLE}</td>
+          <td class="p-3 font-semibold">${l.AKSI}</td>
+          <td class="p-3 text-slate-600">${l.KETERANGAN}</td>
+        </tr>
+      `).join("");
+    }
+
+    function exportTableToCSV() {
+      const table = document.getElementById("masterTable");
+      let csv = [];
+      for (let row of table.rows) {
+        let cols = [];
+        for (let j = 0; j < row.cells.length - 1; j++) cols.push('"' + row.cells[j].innerText + '"');
+        csv.push(cols.join(","));
+      }
+      const blob = new Blob([csv.join("\n")], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `${activeSheet}_export.csv`;
+      link.click();
+      toast("success", "Data berhasil diunduh ke CSV!");
+    }
+
+    function getBadgeColor(st) {
+      switch(st) {
+        case 'H': return 'bg-emerald-600 text-white';
+        case 'I': return 'bg-sky-600 text-white';
+        case 'S': return 'bg-amber-500 text-white';
+        case 'A': return 'bg-rose-600 text-white';
+        case 'T': return 'bg-purple-600 text-white';
+        default: return 'bg-slate-600 text-white';
+      }
+    }
+
+    async function updateAbsen(idSiswa, statusKehadiran) {
+      const tanggal = document.getElementById("filterTanggal").value;
+      const res = await callApi("PROCESS_ABSENSI", { idSiswa, statusKehadiran, tanggal, metode: "MANUAL" });
+      if (res.success) { toast("success", "Absen: " + statusKehadiran); loadAbsensiHarian(); }
+      else { toast("error", res.message); }
+    }
+
+    function initScanner() {
+      const resBox = document.getElementById("scanResult");
+      resBox.className = "p-3 rounded-xl bg-amber-50 text-xs font-bold text-amber-700";
+      resBox.textContent = "Meminta izin kamera...";
+      if (html5QrCode && html5QrCode.isScanning) { html5QrCode.stop().catch(() => {}); }
+      html5QrCode = new Html5Qrcode("reader");
+      html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        async (decodedText) => {
+          const res = await callApi("PROCESS_ABSENSI", { qrToken: decodedText, statusKehadiran: "H", metode: "QR" });
+          if (res.success) {
+            resBox.className = "p-3 rounded-xl bg-emerald-50 text-xs font-bold text-emerald-700";
+            resBox.textContent = `Berhasil Hadir: ${decodedText}`;
+            toast("success", "Absensi QR Berhasil!");
+          } else {
+            resBox.className = "p-3 rounded-xl bg-rose-50 text-xs font-bold text-rose-700";
+            resBox.textContent = res.message;
+            toast("error", res.message);
+          }
+        },
+        (error) => {}
+      ).catch(err => {
+        resBox.className = "p-3 rounded-xl bg-rose-50 text-xs font-bold text-rose-700";
+        resBox.textContent = "Gagal membuka kamera.";
+        toast("error", "Gagal mengaktifkan kamera.");
+      });
+    }
+
+    async function openAddModal() {
+      isEditing = false;
+      editIdValue = "";
+      document.getElementById("modalTitle").textContent = "Tambah Data Baru";
+      renderFormFields({});
+    }
+
+    async function openEditModal(index) {
+      isEditing = true;
+      const rowData = currentRowsData[index];
+      editIdValue = rowData[activeHeaders[0]];
+      document.getElementById("modalTitle").textContent = "Edit Data (" + editIdValue + ")";
+      renderFormFields(rowData);
+    }
+
+    async function renderFormFields(existingData) {
+      document.getElementById("modalForm").classList.remove("hidden");
+      const form = document.getElementById("dynamicForm");
+      form.innerHTML = `<p class="text-xs text-slate-400 text-center py-4">Menyiapkan form...</p>`;
+
+      if (activeSheet === "DATA_SISWA" && cacheKelas.length === 0) {
+        const resK = await callApi("GET_MASTER_DATA", { sheetName: "DATA_KELAS" });
+        if (resK.success) cacheKelas = resK.rows;
+      }
+      if (activeSheet === "DATA_KELAS" && cacheGuru.length === 0) {
+        const resG = await callApi("GET_MASTER_DATA", { sheetName: "DATA_GURU" });
+        if (resG.success) cacheGuru = resG.rows;
+      }
+
+      if (activeSheet === "DATA_AKUN") {
+        if (isEditing) {
+          form.innerHTML = `
+            <div><label class="block text-[11px] font-bold text-slate-600 mb-1">ID AKUN</label><input name="idAkun" value="${existingData.ID_AKUN || ''}" readonly class="w-full px-3 py-2 border rounded-xl text-xs bg-slate-100 text-slate-500"></div>
+            <div><label class="block text-[11px] font-bold text-slate-600 mb-1">USERNAME</label><input name="username" value="${existingData.USERNAME || ''}" required class="w-full px-3 py-2 border rounded-xl text-xs"></div>
+            <div><label class="block text-[11px] font-bold text-slate-600 mb-1">PASSWORD BARU (Opsional)</label><input name="password" type="password" placeholder="Kosongkan jika tidak ingin mengubah password" class="w-full px-3 py-2 border rounded-xl text-xs"></div>
+            <div><label class="block text-[11px] font-bold text-slate-600 mb-1">ROLE</label><select name="role" class="w-full px-3 py-2 border rounded-xl text-xs bg-white"><option value="GURU" ${existingData.ROLE==='GURU'?'selected':''}>GURU</option><option value="SISWA" ${existingData.ROLE==='SISWA'?'selected':''}>SISWA</option><option value="WALI" ${existingData.ROLE==='WALI'?'selected':''}>WALI</option><option value="ADMIN" ${existingData.ROLE==='ADMIN'?'selected':''}>ADMIN</option></select></div>
+            <div><label class="block text-[11px] font-bold text-slate-600 mb-1">STATUS AKUN</label><select name="statusAkun" class="w-full px-3 py-2 border rounded-xl text-xs bg-white"><option value="AKTIF" ${existingData.STATUS_AKUN==='AKTIF'?'selected':''}>AKTIF</option><option value="NONAKTIF" ${existingData.STATUS_AKUN==='NONAKTIF'?'selected':''}>NONAKTIF</option></select></div>
+            <button type="submit" id="btnSubmitModal" class="w-full py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold">Simpan Perubahan Akun</button>
+          `;
+        } else {
+          form.innerHTML = `
+            <input name="idPengguna" placeholder="ID Pengguna (Misal: SIS-XXXXX)" required class="w-full px-3 py-2 border rounded-xl text-xs">
+            <input name="username" placeholder="Username Login" required class="w-full px-3 py-2 border rounded-xl text-xs">
+            <input name="password" type="password" placeholder="Password Awal" required class="w-full px-3 py-2 border rounded-xl text-xs">
+            <select name="role" class="w-full px-3 py-2 border rounded-xl text-xs bg-white">
+              <option value="GURU">GURU</option><option value="SISWA">SISWA</option><option value="WALI">WALI ORANG TUA</option><option value="ADMIN">ADMIN</option>
+            </select>
+            <button type="submit" id="btnSubmitModal" class="w-full py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold">Buat Akun</button>
+          `;
+        }
+        return;
+      }
+
+      form.innerHTML = activeHeaders.map((h, i) => {
+        const val = existingData[h] || "";
+        if (i === 0) return `<div><label class="block text-[11px] font-bold text-slate-600 mb-1">${h}</label><input name="${h}" value="${val}" readonly class="w-full px-3 py-2 border rounded-xl text-xs bg-slate-100 text-slate-500"></div>`;
+        if (h === "QR_TOKEN") return `<div><label class="block text-[11px] font-bold text-slate-600 mb-1">${h}</label><input name="${h}" value="${val}" readonly class="w-full px-3 py-2 border rounded-xl text-xs bg-emerald-50 text-emerald-700"></div>`;
+        if (h === "JENIS_KELAMIN") return `<div><label class="block text-[11px] font-bold text-slate-600 mb-1">${h}</label><select name="${h}" class="w-full px-3 py-2 border rounded-xl text-xs bg-white"><option value="L" ${val==='L'?'selected':''}>L (Laki-laki)</option><option value="P" ${val==='P'?'selected':''}>P (Perempuan)</option></select></div>`;
+        if (h === "STATUS") return `<div><label class="block text-[11px] font-bold text-slate-600 mb-1">${h}</label><select name="${h}" class="w-full px-3 py-2 border rounded-xl text-xs bg-white"><option value="AKTIF" ${val==='AKTIF'?'selected':''}>AKTIF</option><option value="NONAKTIF" ${val==='NONAKTIF'?'selected':''}>NONAKTIF</option></select></div>`;
+        if (h === "ID_KELAS") return `<div><label class="block text-[11px] font-bold text-slate-600 mb-1">KELAS</label><select name="${h}" class="w-full px-3 py-2 border rounded-xl text-xs bg-white">${cacheKelas.map(k => `<option value="${k.ID_KELAS}" ${k.ID_KELAS===val?'selected':''}>${k.NAMA_KELAS}</option>`).join("")}</select></div>`;
+        return `<div><label class="block text-[11px] font-bold text-slate-600 mb-1">${h}</label><input name="${h}" value="${val}" class="w-full px-3 py-2 border rounded-xl text-xs"></div>`;
+      }).join("") + `<button type="submit" id="btnSubmitModal" class="w-full py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-bold">${isEditing ? 'Simpan Perubahan' : 'Simpan Data'}</button>`;
+    }
+
+    function showQR(nama, token) {
+      document.getElementById("qrStudentName").textContent = nama;
+      document.getElementById("qrTokenText").textContent = token;
+      document.getElementById("qrImage").src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(token)}`;
+      document.getElementById("modalQR").classList.remove("hidden");
+    }
+
+    async function submitForm(e) {
+      e.preventDefault();
+      const btn = document.getElementById("btnSubmitModal");
+      btn.disabled = true; btn.textContent = "Menyimpan...";
+
+      const fd = new FormData(e.target);
+      const obj = {};
+      fd.forEach((v, k) => obj[k] = v);
+
+      let res;
+      if (activeSheet === "DATA_AKUN") {
+        res = isEditing 
+          ? await callApi("UPDATE_USER_ACCOUNT", obj)
+          : await callApi("CREATE_USER_ACCOUNT", obj);
+      } else {
+        res = isEditing
+          ? await callApi("UPDATE_MASTER_DATA", { sheetName: activeSheet, idValue: editIdValue, rowData: JSON.stringify(obj) })
+          : await callApi("ADD_MASTER_DATA", { sheetName: activeSheet, rowData: JSON.stringify(obj) });
+      }
+
+      btn.disabled = false;
+      if (res.success) { toast("success", res.message); closeModal(); openMenu(activeSheet, document.getElementById("tableTitle").textContent); }
+      else { toast("error", res.message); }
+    }
+
+    async function deleteRow(idVal) {
+      if (!confirm("Hapus data ID " + idVal + "?")) return;
+      const res = await callApi("DELETE_MASTER_DATA", { sheetName: activeSheet, idValue: idVal });
+      if (res.success) { toast("success", res.message); openMenu(activeSheet, document.getElementById("tableTitle").textContent); }
+      else { toast("error", res.message); }
+    }
+
+    function closeModal() { document.getElementById("modalForm").classList.add("hidden"); }
+    function toggleSidebar() { document.getElementById("sidebar").classList.toggle("-translate-x-full"); }
+    function logout() { localStorage.removeItem("EABSENSI_SESSION"); location.reload(); }
+
+    function toast(type, msg) {
+      const el = document.createElement("div");
+      el.className = `p-3 rounded-xl shadow-lg text-xs font-bold text-white ${type === "success" ? "bg-emerald-600" : "bg-rose-600"}`;
+      el.textContent = msg;
+      document.getElementById("toastBox").appendChild(el);
+      setTimeout(() => el.remove(), 3500);
+    }
+  </script>
+</body>
+</html>
